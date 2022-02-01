@@ -29,7 +29,8 @@ class Widget(QtWidgets.QMainWindow):
 
         self.map_size = 0.0016
         self.coords = [37.618764, 55.759626]
-        request = f"https://static-maps.yandex.ru/1.x/?l=sat&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
+        self.layer, self.traffic = 'map', ''
+        request = f"https://static-maps.yandex.ru/1.x/?l={self.layer + self.traffic}&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
         self.pixmap = QtGui.QPixmap(get_img(request)).scaled(self.w - 30, self.h, Qt.IgnoreAspectRatio)
         self.image = QtWidgets.QLabel(self)
         self.image.move(0, 0)
@@ -47,6 +48,18 @@ class Widget(QtWidgets.QMainWindow):
         self.btn_size_down.move(self.w // 40, self.h // 2 + self.h // 25)
         self.btn_size_down.resize(self.w // 30, self.w // 30)
         self.btn_size_down.clicked.connect(self.size_map_down)
+
+        self.layer_changer = QtWidgets.QPushButton(self)
+        self.layer_changer.setText('Layer')
+        self.layer_changer.move(self.w - self.w // 15, self.h // 25)
+        self.layer_changer.resize(self.w // 20, self.w // 30)
+        self.layer_changer.clicked.connect(self.change_layer)
+
+        self.traffic = QtWidgets.QPushButton(self)
+        self.traffic.setText('Traffic')
+        self.traffic.move(self.w - 2 * (self.w // 15), self.h // 25)
+        self.traffic.resize(self.w // 20, self.w // 30)
+        self.traffic.clicked.connect(lambda: self.change_layer(trf=True))
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Equal:
@@ -74,9 +87,7 @@ class Widget(QtWidgets.QMainWindow):
                 self.map_size = round(self.map_size - 0.004, 4)
             else:
                 self.map_size = round(self.map_size - 0.001, 4)
-        request = f"https://static-maps.yandex.ru/1.x/?l=sat&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
-        pixmap = QtGui.QPixmap(get_img(request)).scaled(self.w - 30, self.h, Qt.IgnoreAspectRatio, Qt.FastTransformation)
-        self.image.setPixmap(pixmap)
+        self.update_image()
 
     def size_map_down(self):
         if self.map_size <= 1.5:
@@ -89,9 +100,7 @@ class Widget(QtWidgets.QMainWindow):
             else:
                 self.map_size += 0.4
             self.map_size = round(self.map_size, 4)
-        request = f"https://static-maps.yandex.ru/1.x/?l=sat&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
-        pixmap = QtGui.QPixmap(get_img(request)).scaled(self.w - 30, self.h, Qt.IgnoreAspectRatio, Qt.FastTransformation)
-        self.image.setPixmap(pixmap)
+        self.update_image()
 
     def move_map_left(self):
         if self.map_size > 0.3:
@@ -100,10 +109,7 @@ class Widget(QtWidgets.QMainWindow):
             self.coords[0] = self.coords[0] + 0.05
         else:
             self.coords[0] = self.coords[0] + 0.004
-        request = f"https://static-maps.yandex.ru/1.x/?l=sat&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
-        pixmap = QtGui.QPixmap(get_img(request)).scaled(self.w - 30, self.h, Qt.IgnoreAspectRatio,
-                                                        Qt.FastTransformation)
-        self.image.setPixmap(pixmap)
+        self.update_image()
 
     def move_map_right(self):
         if self.map_size > 0.3:
@@ -112,10 +118,7 @@ class Widget(QtWidgets.QMainWindow):
             self.coords[0] = self.coords[0] - 0.05
         else:
             self.coords[0] = self.coords[0] - 0.004
-        request = f"https://static-maps.yandex.ru/1.x/?l=sat&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
-        pixmap = QtGui.QPixmap(get_img(request)).scaled(self.w - 30, self.h, Qt.IgnoreAspectRatio,
-                                                        Qt.FastTransformation)
-        self.image.setPixmap(pixmap)
+        self.update_image()
 
     def move_map_up(self):
         if self.map_size > 0.8:
@@ -126,10 +129,7 @@ class Widget(QtWidgets.QMainWindow):
             self.coords[1] = self.coords[1] + 0.05
         else:
             self.coords[1] = self.coords[1] + 0.003
-        request = f"https://static-maps.yandex.ru/1.x/?l=sat&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
-        pixmap = QtGui.QPixmap(get_img(request)).scaled(self.w - 30, self.h, Qt.IgnoreAspectRatio,
-                                                        Qt.FastTransformation)
-        self.image.setPixmap(pixmap)
+        self.update_image()
 
     def move_map_down(self):
         if self.map_size > 0.8:
@@ -140,10 +140,21 @@ class Widget(QtWidgets.QMainWindow):
             self.coords[1] = self.coords[1] - 0.05
         else:
             self.coords[1] = self.coords[1] - 0.003
-        request = f"https://static-maps.yandex.ru/1.x/?l=sat&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
+        self.update_image()
+
+    def change_layer(self, trf=False):
+        if not trf:
+            self.layer = 'sat,skl' if self.layer == 'map' else 'map'
+        else:
+            self.traffic = ',trf' if self.traffic == '' else ''
+        self.update_image()
+
+    def update_image(self):
+        request = f"https://static-maps.yandex.ru/1.x/?l={self.layer + self.traffic}&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
         pixmap = QtGui.QPixmap(get_img(request)).scaled(self.w - 30, self.h, Qt.IgnoreAspectRatio,
                                                         Qt.FastTransformation)
         self.image.setPixmap(pixmap)
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
