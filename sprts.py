@@ -12,12 +12,24 @@ def get_img(map_request):
         print(map_request)
         print("Http статус:", response.status_code, "(", response.reason, ")")
         sys.exit(1)
-    map_file = "map.png"
-    os.remove(map_file)
+    if os.path.isfile('map.png'):
+        os.remove('map.png')
     map_file = "map.png"
     with open(map_file, "wb") as file:
         file.write(response.content)
     return map_file
+
+
+def get_info(request):
+    response = requests.get(request)
+    if not response:
+        print("Ошибка выполнения запроса:")
+        print(request)
+        print("Http статус:", response.status_code, "(", response.reason, ")")
+    json_response = response.json()
+    toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+    coords = [float(i) for i in toponym['Point']['pos'].split()]
+    return coords
 
 
 class Widget(QtWidgets.QMainWindow):
@@ -30,6 +42,7 @@ class Widget(QtWidgets.QMainWindow):
         self.map_size = 0.0016
         self.coords = [37.618764, 55.759626]
         self.layer, self.traffic = 'map', ''
+
         request = f"https://static-maps.yandex.ru/1.x/?l={self.layer + self.traffic}&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
         self.pixmap = QtGui.QPixmap(get_img(request)).scaled(self.w - 30, self.h, Qt.IgnoreAspectRatio)
         self.image = QtWidgets.QLabel(self)
@@ -55,11 +68,20 @@ class Widget(QtWidgets.QMainWindow):
         self.layer_changer.resize(self.w // 20, self.w // 30)
         self.layer_changer.clicked.connect(self.change_layer)
 
-        self.traffic = QtWidgets.QPushButton(self)
-        self.traffic.setText('Traffic')
-        self.traffic.move(self.w - 2 * (self.w // 15), self.h // 25)
-        self.traffic.resize(self.w // 20, self.w // 30)
-        self.traffic.clicked.connect(lambda: self.change_layer(trf=True))
+        self.traffic_changer = QtWidgets.QPushButton(self)
+        self.traffic_changer.setText('Traffic')
+        self.traffic_changer.move(self.w - 2 * (self.w // 15), self.h // 25)
+        self.traffic_changer.resize(self.w // 20, self.w // 30)
+        self.traffic_changer.clicked.connect(lambda: self.change_layer(trf=True))
+
+        self.lineEdit = QtWidgets.QLineEdit(self)
+        self.lineEdit.resize(self.w // 9, self.w // 35)
+        self.lineEdit.move(self.w // 55, self.w // 45)
+
+        self.done_btn = QtWidgets.QPushButton(self)
+        self.done_btn.resize(self.w // 20, self.w // 35)
+        self.done_btn.move(self.w // 15 * 2, self.h // 25)
+        self.done_btn.pressed.connect(lambda: self.move_to_new_place(self.lineEdit.text()))
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Equal:
@@ -149,11 +171,16 @@ class Widget(QtWidgets.QMainWindow):
             self.traffic = ',trf' if self.traffic == '' else ''
         self.update_image()
 
+    def move_to_new_place(self, text):
+        req = f"http://geocode-maps.yandex.ru/1.x/?apikey=40d1649f-0493-4b70-98ba-98533de7710b&geocode={text}&format=json"
+        self.coords = get_info(req)
+        self.map_size = 0.0016
+        self.update_image()
+
     def update_image(self):
         request = f"https://static-maps.yandex.ru/1.x/?l={self.layer + self.traffic}&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
-        pixmap = QtGui.QPixmap(get_img(request)).scaled(self.w - 30, self.h, Qt.IgnoreAspectRatio,
-                                                        Qt.FastTransformation)
-        self.image.setPixmap(pixmap)
+        self.pixmap = QtGui.QPixmap(get_img(request)).scaled(self.w - 30, self.h, Qt.IgnoreAspectRatio)
+        self.image.setPixmap(self.pixmap)
 
 
 if __name__ == "__main__":
