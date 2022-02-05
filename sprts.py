@@ -22,18 +22,16 @@ def get_img(map_request):
 
 def get_info(request):
     response = requests.get(request)
-    if not response:
-        print("Ошибка выполнения запроса:")
-        print(request)
-        print("Http статус:", response.status_code, "(", response.reason, ")")
-    json_response = response.json()
-    toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
-    coords = [float(i) for i in toponym['Point']['pos'].split()]
-    return coords
+    if response:
+        json_response = response.json()
+        if json_response['response']['GeoObjectCollection']['metaDataProperty']['GeocoderResponseMetaData']['found'] != '0':
+            toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+            coords = [float(i) for i in toponym['Point']['pos'].split()]
+            return coords
 
 
 class Widget(QtWidgets.QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self):
         super().__init__()
         scr = QtWidgets.QApplication.desktop().screenGeometry()
         self.w, self.h = scr.width(), scr.height()
@@ -79,9 +77,16 @@ class Widget(QtWidgets.QMainWindow):
         self.lineEdit.move(self.w // 55, self.w // 45)
 
         self.done_btn = QtWidgets.QPushButton(self)
+        self.done_btn.setText('Search')
         self.done_btn.resize(self.w // 20, self.w // 35)
         self.done_btn.move(self.w // 15 * 2, self.h // 25)
         self.done_btn.pressed.connect(lambda: self.move_to_new_place(self.lineEdit.text()))
+
+        self.clear = QtWidgets.QPushButton(self)
+        self.clear.setText('X')
+        self.clear.resize(self.w // 35, self.w // 35)
+        self.clear.move(self.w // 16 * 3, self.h // 25)
+        self.clear.pressed.connect(self.clear_lnedit)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Equal:
@@ -172,8 +177,9 @@ class Widget(QtWidgets.QMainWindow):
         self.update_image()
 
     def move_to_new_place(self, text):
-        req = f"http://geocode-maps.yandex.ru/1.x/?apikey=40d1649f-0493-4b70-98ba-98533de7710b&geocode={text}&format=json"
-        self.coords = get_info(req)
+        req = f"http://geocode-maps.yandex.ru/1.x/?apikey=40d1649f-0493-4b70-98ba-98533de7710b&geocode={'+'.join(text.split())}&format=json&lang=en_RU"
+        coords = get_info(req)
+        self.coords = coords if coords is not None else self.coords
         self.map_size = 0.0016
         self.update_image()
 
@@ -181,6 +187,15 @@ class Widget(QtWidgets.QMainWindow):
         request = f"https://static-maps.yandex.ru/1.x/?l={self.layer + self.traffic}&ll={self.coords[0]},{self.coords[1]}&spn={self.map_size},{self.map_size}&size=650,450"
         self.pixmap = QtGui.QPixmap(get_img(request)).scaled(self.w - 30, self.h, Qt.IgnoreAspectRatio)
         self.image.setPixmap(self.pixmap)
+
+    def clear_lnedit(self):
+        if self.lineEdit.text() != '':
+            self.lineEdit.clear()
+        else:
+            self.map_size = 0.0016
+            self.coords = [37.618764, 55.759626]
+            self.lineEdit.clear()
+            self.update_image()
 
 
 if __name__ == "__main__":
